@@ -1,0 +1,37 @@
+{
+  "name": "postcss-athena-spritesmith",
+  "version": "0.0.1",
+  "description": "Generate sprites from stylesheets Just For Athena.",
+  "main": "index.js",
+  "keywords": [
+    "postcss",
+    "sprite",
+    "spritesheet",
+    "generator",
+    "css",
+    "spritesmith",
+    "png",
+    "postcss-plugin"
+  ],
+  "author": {
+    "name": "sky cai",
+    "url": "https://github.com/cnt1992"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/o2team/postcss-athena-spritesmith.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "postcss": "^5.0.2",
+    "async": "^0.9.0",
+    "lodash": "^3.8.0",
+    "mkdirp": "^0.5.1",
+    "q": "^1.4.0",
+    "spritesmith": "^1.3.1"
+  },
+  "devDependencies": {
+    "tape": "^4.0.0",
+    "tap-spec": "^3.0.0"
+  }
+}
