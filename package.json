@@ -1,6 +1,6 @@
 {
   "name": "postcss-athena-spritesmith",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Generate sprites from stylesheets Just For Athena.",
   "main": "index.js",
   "keywords": [

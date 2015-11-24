@@ -40,11 +40,12 @@ var defaults = {
 	groupBy         : [],
 	retina          : false,
 	verbose         : false,
+	rootvalue       : 0,
 
 	// spritesmith options
 	engine        : 'pixelsmith',
 	algorithm     : 'binary-tree',
-	padding       : 0,
+	padding       : 4,
 	engineOpts    : {},
 	exportOpts    : {}
 };
@@ -289,14 +290,13 @@ function setTokens(images, opts, css) {
 					// We remove these declarations since
 					// our plugin will insert them when
 					// they are necessary.
-					rule.walkDecls(/^background-(size|position)$/, function(decl) {
+					rule.walkDecls(/^background-(repeat|size|position)$/, function(decl) {
 						decl.remove();
 					});
 
 					if (decl.prop === BACKGROUND) {
 						
-						color = getColor(decl);	
-						repeat = getRepeat(decl) || 'no-repeat';					
+						color = getColor(decl);					
 
 						// Extract color to background-color propery
 						if (color && color.length === 1) {
@@ -307,26 +307,13 @@ function setTokens(images, opts, css) {
 							declaration.raws.before = ' ';
 
 							rule.append(declaration);
-						}
-
-						// 解析repeat
-						if( repeat ){
-							declaration = postcss.decl({
-								prop: 'background-repeat',
-								value: repeat[0]
-							});
-							declaration.raws.before = ' ';
-
-							rule.append(declaration);	
-						}
+						}						
 
 					}					
 
 					if (decl.prop === BACKGROUND || decl.prop === BACKGROUND_IMAGE) {
-						repeat = getRepeat(decl) || 'repeat';
 						image.token = postcss.comment({
-							text: image.url,
-							repeat: repeat
+							text: image.url
 						});
 
 						image.token.raws.before = ' ';
@@ -432,8 +419,7 @@ function saveSprites(images, opts, sprites) {
 
 				return Q.nfcall(fs.writeFile, sprite.path, new Buffer(sprite.image, 'binary'))
 					.then(function() {
-						console.log(util.format('Spritesheet %s generated.', sprite.path), opts.verbose);
-
+						//console.log(util.format('Spritesheet %s generated.', sprite.path), opts.verbose);
 						return sprite;
 					});
 			})
@@ -507,7 +493,7 @@ function updateReferences(images, opts, sprites, css) {
 
 					backgroundPosition = postcss.decl({
 						prop: 'background-position',
-						value: getBackgroundPosition(image)
+						value: getBackgroundPosition(image,opts)
 					});
 
 					// Replace the comment and append necessary properties.
@@ -531,7 +517,7 @@ function updateReferences(images, opts, sprites, css) {
 					if (image.retina) {
 						backgroundSize = postcss.decl({
 							prop: 'background-size',
-							value: getBackgroundSize(image)
+							value: getBackgroundSize(image, opts)
 						});
 
 						backgroundPosition.parent.insertAfter(backgroundPosition, backgroundSize);
@@ -539,6 +525,8 @@ function updateReferences(images, opts, sprites, css) {
 				}
 			}
 		});
+
+		//console.log(images,'images');
 
 		resolve([images, opts, sprites, css]);
 	});
@@ -611,16 +599,6 @@ function getColor(decl) {
 		}
 	});
 
-	return matches;
-}
-
-//add by sky
-function getRepeat( decl ){
-	var matches = null;
-	var regex = /\brepeat-(x|y)/gi;
-	if( regex.test(decl.value) ){		
-		matches = decl.value.match(regex);
-	}
 	return matches;
 }
 
@@ -742,10 +720,20 @@ function getBackgroundImageUrl(image) {
  * @param  {Object} image
  * @return {String}
  */
-function getBackgroundPosition(image) {
+function getBackgroundPosition(image, opts) {
 	var x        = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
 	var y        = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
 	var template = lodash.template("<%= (x ? x + 'px' : x) %> <%= (y ? y + 'px' : y) %>");
+	
+	// px to rem
+	var rootvalue = opts.rootvalue;
+	if( rootvalue !== 0 ){
+		x = x/rootvalue;
+		y = y/rootvalue;
+		template = lodash.template("<%= (x ? x + 'rem' : x) %> <%= (y? y + 'rem' : y) %>");
+	}
+	//console.log(opts,'opts');
+	
 
 	return template({ x: x, y: y });
 }
@@ -756,10 +744,18 @@ function getBackgroundPosition(image) {
  * @param  {Object} image
  * @return {String}
  */
-function getBackgroundSize(image) {
+function getBackgroundSize(image, opts) {
 	var x        = image.properties.width / image.ratio;
 	var y        = image.properties.height / image.ratio;
 	var template = lodash.template("<%= x %>px <%= y %>px");
+
+	// px to rem
+	var rootvalue = opts.rootvalue;
+	if( rootvalue !== 0 ){
+		x = x/rootvalue;
+		y = y/rootvalue;
+		template = lodash.template("<%= x %>rem <%= y %>rem");
+	}
 
 	return template({ x: x, y: y });
 }
