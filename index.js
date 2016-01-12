@@ -307,7 +307,9 @@ function setTokens(images, opts, css) {
 							declaration.raws.before = ' ';
 
 							rule.append(declaration);
-						}						
+						}
+
+
 
 					}					
 
@@ -496,6 +498,11 @@ function updateReferences(images, opts, sprites, css) {
 						value: getBackgroundPosition(image,opts)
 					});
 
+					backgroundRepeat = postcss.decl({
+						prop: 'background-repeat',
+						value: 'no-repeat'
+					});
+
 					// Replace the comment and append necessary properties.
 					comment.replaceWith(backgroundImage);
 
@@ -512,7 +519,7 @@ function updateReferences(images, opts, sprites, css) {
 
 					rule.insertAfter(backgroundImage, backgroundPosition);
 
-					//rule.insertAfter(backgroundPosition, backgroundRepeat);
+					rule.insertAfter(backgroundPosition, backgroundRepeat);
 
 					if (image.retina) {
 						backgroundSize = postcss.decl({
@@ -745,13 +752,20 @@ function getBackgroundPosition(image, opts) {
  * @return {String}
  */
 function getBackgroundSize(image, opts) {
-	var x        = image.properties.width / image.ratio;
-	var y        = image.properties.height / image.ratio;
+	var x,y;
+	if( rootvalue !== 0 ){
+		x        = image.properties.width;
+		y        = image.properties.height;	
+	}else{
+		x        = image.properties.width / image.ratio;
+		y        = image.properties.height / image.ratio;	
+	}
+	
 	var template = lodash.template("<%= x %>px <%= y %>px");
 
 	// px to rem
 	var rootvalue = opts.rootvalue;
-	if( rootvalue !== 0 ){
+	if( rootvalue !== 0 ){		
 		x = x/rootvalue;
 		y = y/rootvalue;
 		template = lodash.template("<%= x %>rem <%= y %>rem");
