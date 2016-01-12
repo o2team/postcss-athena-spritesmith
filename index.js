@@ -728,8 +728,15 @@ function getBackgroundImageUrl(image) {
  * @return {String}
  */
 function getBackgroundPosition(image, opts) {
-	var x        = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
-	var y        = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
+	var x,y;
+	if( rootvalue !== 0 ){
+		x        = -1 * image.coordinates.x;
+		y        = -1 * image.coordinates.y;
+	}else{
+		x        = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
+		y        = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
+	}
+	
 	var template = lodash.template("<%= (x ? x + 'px' : x) %> <%= (y ? y + 'px' : y) %>");
 	
 	// px to rem
