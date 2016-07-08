@@ -33,6 +33,7 @@ var BACKGROUND_SIZE   = 'background-size';
  */
 var defaults = {
 	stylesheetPath  : './',
+	imageFolder				: 'images',
 	spritePath      : './sprite.png',
 	skipPrefix      : false,
 	outputDimensions: false,
@@ -40,7 +41,7 @@ var defaults = {
 	groupBy         : [],
 	retina          : false,
 	verbose         : false,
-	rootvalue       : 0,
+	rootValue       : 0,
 
 	// spritesmith options
 	engine        : 'pixelsmith',
@@ -93,7 +94,7 @@ function plugin(opts) {
 					log('Error: ' + err);
 				}
 			});
-	}
+	};
 }
 
 /**
@@ -105,7 +106,7 @@ function plugin(opts) {
  * @return {Array}
 */
 function getImages(css, opts) {
-	var images        = [];
+	var images = [];
 
 	// Find only background & background-image declarations.
 	css.walkRules(function(rule) {
@@ -115,6 +116,7 @@ function getImages(css, opts) {
 		var image = {
 			path    : null,
 			url     : null,
+			urlSpe  : null,
 			retina  : false,
 			ratio   : 1,
 			groups  : [],
@@ -123,9 +125,10 @@ function getImages(css, opts) {
 
 		// Manipulate only rules with background image
 		// in them.
-		if ( hasImageInRule( rule.toString() ) && hasSpriteTagInRule( rule.toString() ) ) {
+		if (hasImageInRule(rule.toString()) && hasSpriteTagInRule(rule.toString())) {
 			image.url = getImageUrl(rule.toString());
-
+			image.urlSpe = getImageUrlSpe(rule.toString());
+			
 			if (isImageSupported(image.url)) {
 				// Perform search for retina
 				// images if option is allowed.
@@ -136,11 +139,9 @@ function getImages(css, opts) {
 
 				// Get the path to the image.
 				var _path = styleFilePath.substring(0, styleFilePath.lastIndexOf(path.sep));
-				
 				var __path = _path.substring(0, _path.lastIndexOf(path.sep));
-				
-				image.path = path.resolve(__path, image.url);
-
+				var _url = getImagePath(opts.imageFolder, image.url).path;
+				image.path = path.resolve(__path, _url);
 				images.push(image);
 			} else {
 				console.log('Skip ' + image.url + ' - not supported.', opts.verbose);
@@ -156,6 +157,26 @@ function getImages(css, opts) {
 		})
 		.value();
 	return images;
+}
+
+function getImagePath (imageFolder, fpath) {
+	var dirname = path.dirname(fpath);
+	var dirnameArr = [];
+	var splitFlag = '';
+	if (dirname.indexOf('\/') >= 0) {
+		splitFlag = '\/';
+	} else {
+		splitFlag = '\\';
+	}
+	dirnameArr = dirname.split(splitFlag);
+	var imagesIndex = dirnameArr.indexOf(imageFolder);
+	if (imagesIndex >= 0) {
+		fpath = fpath.split(splitFlag).splice(imagesIndex).join(splitFlag);
+	}
+	return {
+		index: imagesIndex,
+		path: fpath
+	};
 }
 
 /**
@@ -178,7 +199,6 @@ function setupFilterBy(opts) {
 				if (!exists) {
 					log('Skip ' + image.url + ' - not exist.',  opts.verbose);
 				}
-
 				resolve(exists);
 			});
 		});
@@ -350,7 +370,7 @@ function runSpriteSmith(images, opts) {
 		var all = lodash
 			.chain(images)
 			.groupBy(function (image) {
-				var temp;				
+				var temp;
 				temp = image.groups.map(mask(true));				
 				temp.unshift('_');
 
@@ -395,7 +415,7 @@ function runSpriteSmith(images, opts) {
 				if (err) {
 					reject(err);
 				}
-			})
+			});
 	});
 }
 
@@ -418,10 +438,8 @@ function saveSprites(images, opts, sprites) {
 			.chain(sprites)
 			.map(function(sprite) {
 				sprite.path = makeSpritePath(opts, sprite.groups);
-
 				return Q.nfcall(fs.writeFile, sprite.path, new Buffer(sprite.image, 'binary'))
 					.then(function() {
-						//console.log(util.format('Spritesheet %s generated.', sprite.path), opts.verbose);
 						return sprite;
 					});
 			})
@@ -533,8 +551,6 @@ function updateReferences(images, opts, sprites, css) {
 			}
 		});
 
-		//console.log(images,'images');
-
 		resolve([images, opts, sprites, css]);
 	});
 }
@@ -575,6 +591,12 @@ function hasImageInRule(rule) {
 
 function hasSpriteTagInRule(rule) {
 	return /\?__sprite/gi.test(rule);
+}
+
+// 获取sprite后面的图片区分符
+function getImageUrlSpe(rule) {
+	var match = /background[^:]*:.*url\(([\S]+)\)/gi.exec(rule);
+	return match ? match[1].replace(/['"]/gi, '').split('=')[1] : '';
 }
 
 /**
@@ -690,7 +712,6 @@ function makeSpritePath(opts, groups) {
 
 	parts = file.split('.');
 	Array.prototype.splice.apply(parts, [parts.length - 1, 0].concat(groups));
-
 	if (opts.skipPrefix) {
 		parts.shift();
 	}
@@ -729,7 +750,7 @@ function getBackgroundImageUrl(image) {
  */
 function getBackgroundPosition(image, opts) {
 	var x,y;
-	if( rootvalue !== 0 ){
+	if( rootValue !== 0 ){
 		x        = -1 * image.coordinates.x;
 		y        = -1 * image.coordinates.y;
 	}else{
@@ -740,14 +761,12 @@ function getBackgroundPosition(image, opts) {
 	var template = lodash.template("<%= (x ? x + 'px' : x) %> <%= (y ? y + 'px' : y) %>");
 	
 	// px to rem
-	var rootvalue = opts.rootvalue;
-	if( rootvalue !== 0 ){
-		x = x/rootvalue;
-		y = y/rootvalue;
+	var rootValue = opts.rootValue;
+	if( rootValue !== 0 ){
+		x = x/rootValue;
+		y = y/rootValue;
 		template = lodash.template("<%= (x ? x + 'rem' : x) %> <%= (y? y + 'rem' : y) %>");
 	}
-	//console.log(opts,'opts');
-	
 
 	return template({ x: x, y: y });
 }
@@ -760,7 +779,7 @@ function getBackgroundPosition(image, opts) {
  */
 function getBackgroundSize(image, opts) {
 	var x,y;
-	if( rootvalue !== 0 ){
+	if( rootValue !== 0 ){
 		x        = image.properties.width;
 		y        = image.properties.height;	
 	}else{
@@ -771,10 +790,10 @@ function getBackgroundSize(image, opts) {
 	var template = lodash.template("<%= x %>px <%= y %>px");
 
 	// px to rem
-	var rootvalue = opts.rootvalue;
-	if( rootvalue !== 0 ){		
-		x = x/rootvalue;
-		y = y/rootvalue;
+	var rootValue = opts.rootValue;
+	if( rootValue !== 0 ){		
+		x = x/rootValue;
+		y = y/rootValue;
 		template = lodash.template("<%= x %>rem <%= y %>rem");
 	}
 
