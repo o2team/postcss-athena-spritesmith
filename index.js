@@ -699,7 +699,6 @@ function makeSpritePath(opts, groups) {
 	var extname = path.extname(opts.spritePath);
 	var file   = path.basename(opts.spritePath, extname);
 	var parts;
-console.log(groups);
 	if (!groups.length) {
 		return opts.spritePath;
 	}
