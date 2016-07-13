@@ -36,7 +36,7 @@ var defaults = {
 	imageFolder				: 'images',
 	spritePath      : './sprite.png',
 	skipPrefix      : false,
-	outputDimensions: false,
+	outputDimensions: true,
 	filterBy        : [],
 	groupBy         : [],
 	retina          : false,
@@ -87,8 +87,6 @@ function plugin(opts) {
 			.spread(function(images, opts, sprites) {
 				return updateReferences(images, opts, sprites, css);
 			})
-			.then(function(a) {
-			})
 			.catch(function(err) {
 				if (err) {
 					log('Error: ' + err);
@@ -128,7 +126,6 @@ function getImages(css, opts) {
 		if (hasImageInRule(rule.toString()) && hasSpriteTagInRule(rule.toString())) {
 			image.url = getImageUrl(rule.toString());
 			image.urlSpe = getImageUrlSpe(rule.toString());
-			
 			if (isImageSupported(image.url)) {
 				// Perform search for retina
 				// images if option is allowed.
@@ -310,7 +307,7 @@ function setTokens(images, opts, css) {
 					// We remove these declarations since
 					// our plugin will insert them when
 					// they are necessary.
-					rule.walkDecls(/^background-(repeat|size|position)$/, function(decl) {
+					rule.walkDecls(/^background-(repeat|size|position)|width|height$/, function(decl) {
 						decl.remove();
 					});
 
@@ -328,9 +325,6 @@ function setTokens(images, opts, css) {
 
 							rule.append(declaration);
 						}
-
-
-
 					}					
 
 					if (decl.prop === BACKGROUND || decl.prop === BACKGROUND_IMAGE) {
@@ -500,7 +494,6 @@ function updateReferences(images, opts, sprites, css) {
 			if (isToken(comment)) {
 
 				image = lodash.find(images, { url: comment.text });				
-
 				if (image) {
 					// Generate correct ref to the sprite
 					image.spriteRef = path.relative(opts.stylesheetPath, image.spritePath);
@@ -530,7 +523,7 @@ function updateReferences(images, opts, sprites, css) {
 						['height', 'width'].forEach(function(prop) {
 							rule.insertAfter(backgroundImage, postcss.decl({
 								prop: prop,
-								value: (image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop]) + 'px'
+								value: getDimensions(image, opts, prop)
 							}));
 						});
 					}
@@ -703,20 +696,29 @@ function mask(toggle) {
 function makeSpritePath(opts, groups) {
 	var groups = groups || [];
 	var base   = path.dirname(opts.spritePath);
-	var file   = path.basename(opts.spritePath);
+	var extname = path.extname(opts.spritePath);
+	var file   = path.basename(opts.spritePath, extname);
 	var parts;
-
+console.log(groups);
 	if (!groups.length) {
 		return opts.spritePath;
 	}
-
-	parts = file.split('.');
-	Array.prototype.splice.apply(parts, [parts.length - 1, 0].concat(groups));
-	if (opts.skipPrefix) {
-		parts.shift();
+	var retinaIndex = -1;
+	var retinaItem = '';
+	var ret = '';
+	groups.forEach(function (item, i) {
+		if (/@(\d)x/.test(item)) {
+			retinaIndex = i;
+			retinaItem = item;
+		}
+	});
+	if (retinaIndex >= 0) {
+		groups.splice(retinaIndex, 1);
 	}
-
-	return path.join(base, parts.join('.'));
+	parts = file.split('.');
+	parts = parts.concat(groups);
+	ret = parts.join('_') + retinaItem + extname;
+	return path.join(base, ret);
 }
 
 /**
@@ -750,21 +752,15 @@ function getBackgroundImageUrl(image) {
  */
 function getBackgroundPosition(image, opts) {
 	var x,y;
-	if( rootValue !== 0 ){
-		x        = -1 * image.coordinates.x;
-		y        = -1 * image.coordinates.y;
-	}else{
-		x        = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
-		y        = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
-	}
-	
+	x = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
+	y = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
 	var template = lodash.template("<%= (x ? x + 'px' : x) %> <%= (y ? y + 'px' : y) %>");
 	
 	// px to rem
 	var rootValue = opts.rootValue;
-	if( rootValue !== 0 ){
-		x = x/rootValue;
-		y = y/rootValue;
+	if( rootValue !== 0 ) {
+		x = pxToRem(x, rootValue);
+		y = pxToRem(y, rootValue);
 		template = lodash.template("<%= (x ? x + 'rem' : x) %> <%= (y? y + 'rem' : y) %>");
 	}
 
@@ -779,23 +775,30 @@ function getBackgroundPosition(image, opts) {
  */
 function getBackgroundSize(image, opts) {
 	var x,y;
-	if( rootValue !== 0 ){
-		x        = image.properties.width;
-		y        = image.properties.height;	
-	}else{
-		x        = image.properties.width / image.ratio;
-		y        = image.properties.height / image.ratio;	
-	}
-	
+	x = image.properties.width / image.ratio;
+	y = image.properties.height / image.ratio;	
 	var template = lodash.template("<%= x %>px <%= y %>px");
 
 	// px to rem
 	var rootValue = opts.rootValue;
-	if( rootValue !== 0 ){		
-		x = x/rootValue;
-		y = y/rootValue;
+	if (rootValue !== 0) {
+		x = pxToRem(x, rootValue);
+		y = pxToRem(y, rootValue);
 		template = lodash.template("<%= x %>rem <%= y %>rem");
 	}
 
 	return template({ x: x, y: y });
+}
+
+function getDimensions (image, opts, prop) {
+	var rootValue = opts.rootValue;
+	if (rootValue !== 0) {
+		return pxToRem(image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop], rootValue) + 'rem';
+	} else {
+		return (image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop]) + 'px';
+	}
+}
+
+function pxToRem (px, rootValue) {
+	return px / rootValue;
 }
