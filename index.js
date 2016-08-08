@@ -35,6 +35,7 @@ var defaults = {
 	stylesheetPath  : './',
 	imageFolder				: 'images',
 	spritePath      : './sprite.png',
+	backupPath      : './',
 	skipPrefix      : false,
 	outputDimensions: true,
 	filterBy        : [],
@@ -65,7 +66,6 @@ module.exports = postcss.plugin('postcss-athena-spritesmith', plugin);
 function plugin(opts) {
 	// Extend default options.
 	var options = lodash.merge({}, defaults, opts || {});
-
 	// Prepare filterBy functions.
 	setupFilterBy(options);
 
@@ -139,6 +139,10 @@ function getImages(css, opts) {
 				var __path = _path.substring(0, _path.lastIndexOf(path.sep));
 				var _url = getImagePath(opts.imageFolder, image.url).path;
 				image.path = path.resolve(__path, _url);
+				if (!fs.existsSync(image.path)) {
+					var backupPath = path.resolve(opts.backupPath, _url);
+					image.path = backupPath;
+				}
 				images.push(image);
 			} else {
 				console.log('Skip ' + image.url + ' - not supported.', opts.verbose);
