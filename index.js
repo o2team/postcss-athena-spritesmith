@@ -108,11 +108,11 @@ function plugin(opts) {
 function getImages(css, opts) {
 		var images = [];
 		//save local rootValue
-		var sprite_rootvalue = opts.rootValue;
+		var spriteRootValue = opts.rootValue;
 		// Find only background & background-image declarations.
 		css.walkRules(function(rule) {
 			var styleFilePath = rule.source.input.file;
-			var pxOrRem = '';
+			var urlSpeObj = '';
 			// The host object
 			// for each found image.
 			var image = {
@@ -129,11 +129,9 @@ function getImages(css, opts) {
 			// in them.
 			if (hasImageInRule(rule.toString()) && hasSpriteTagInRule(rule.toString())) {
 				image.url = getImageUrl(rule.toString());
-				image = getImageUrlSpe(rule.toString(),image,sprite_rootvalue);
-				image.urlSpe = image.urlSpe.split('&')[0];
-				// console.log(image.urlSpe);
-				// console.log(images);
-				// console.log(opts.rootValue);
+				urlSpeObj = getImageUrlSpe(rule.toString(),image,spriteRootValue);
+				image.urlSpe = urlSpeObj.urlSpe.split('&')[0];
+				image.rootValue = urlSpeObj.rootValue;
 				if (isImageSupported(image.url)) {
 					// Perform search for retina
 					// images if option is allowed.
@@ -166,7 +164,6 @@ function getImages(css, opts) {
 				return image.path;
 			})
 			.value();
-		// console.log(images);
 		return [images, opts];
 }
 
@@ -499,7 +496,6 @@ function mapSpritesProperties(images, opts, sprites) {
  * @return {Promise}
  */
 function updateReferences(images, opts, sprites, css) {
-	// console.log(opts.rootValue);
 	return Q.Promise(function(resolve, reject) {
 		css.walkComments(function(comment) {
 			var rule, image, backgroundImage, backgroundPosition, backgroundSize, backgroundRepeat;
@@ -617,7 +613,10 @@ function getImageUrlSpe(rule,image,rootValue) {
 		}
 	}
 	
-	return image;
+	return {
+		'urlSpe': image.urlSpe,
+		'rootValue': image.rootValue
+	};
 }
 
 /**
@@ -782,11 +781,9 @@ function getBackgroundPosition(image, opts) {
 	x = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
 	y = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
 	var template = lodash.template("<%= (x ? x + 'px' : x) %> <%= (y ? y + 'px' : y) %>");
-	// console.log(opts);
 	// px to rem
 	//分图片处理 获取 单个images的rootValue
 	var rootValue = opts.rootValue;
-	// console.log(rootValue);
 	if( rootValue !== 0 ) {
 		x = pxToRem(x, rootValue);
 		y = pxToRem(y, rootValue);
