@@ -75,7 +75,9 @@ function plugin(opts) {
 	// Plugin initializer.
 	return function(css) {
 		return Q
-			.all([getImages(css, options), options])
+			.fcall(function(){
+				return getImages(css, options)
+			})
 			.spread(applyFilterBy)
 			.spread(applyGroupBy)
 			.spread(function(images, opts){
@@ -104,60 +106,68 @@ function plugin(opts) {
  * @return {Array}
 */
 function getImages(css, opts) {
-	var images = [];
+		var images = [];
+		//save local rootValue
+		var sprite_rootvalue = opts.rootValue;
+		// Find only background & background-image declarations.
+		css.walkRules(function(rule) {
+			var styleFilePath = rule.source.input.file;
+			var pxOrRem = '';
+			// The host object
+			// for each found image.
+			var image = {
+				path    : null,
+				url     : null,
+				urlSpe  : null,
+				retina  : false,
+				ratio   : 1,
+				groups  : [],
+				token   : ''
+			};
 
-	// Find only background & background-image declarations.
-	css.walkRules(function(rule) {
-		var styleFilePath = rule.source.input.file;
-		// The host object
-		// for each found image.
-		var image = {
-			path    : null,
-			url     : null,
-			urlSpe  : null,
-			retina  : false,
-			ratio   : 1,
-			groups  : [],
-			token   : ''
-		};
+			// Manipulate only rules with background image
+			// in them.
+			if (hasImageInRule(rule.toString()) && hasSpriteTagInRule(rule.toString())) {
+				image.url = getImageUrl(rule.toString());
+				image = getImageUrlSpe(rule.toString(),image,sprite_rootvalue);
+				image.urlSpe = image.urlSpe.split('&')[0];
+				// console.log(image.urlSpe);
+				// console.log(images);
+				// console.log(opts.rootValue);
+				if (isImageSupported(image.url)) {
+					// Perform search for retina
+					// images if option is allowed.
+					if (opts.retina && isRetinaImage(image.url)) {
+						image.retina = true;
+						image.ratio  = getRetinaRatio(image.url);
+					}
 
-		// Manipulate only rules with background image
-		// in them.
-		if (hasImageInRule(rule.toString()) && hasSpriteTagInRule(rule.toString())) {
-			image.url = getImageUrl(rule.toString());
-			image.urlSpe = getImageUrlSpe(rule.toString());
-			if (isImageSupported(image.url)) {
-				// Perform search for retina
-				// images if option is allowed.
-				if (opts.retina && isRetinaImage(image.url)) {
-					image.retina = true;
-					image.ratio  = getRetinaRatio(image.url);
+					// Get the path to the image.
+					var _path = styleFilePath.substring(0, styleFilePath.lastIndexOf(path.sep));
+					var __path = _path.substring(0, _path.lastIndexOf(path.sep));
+					var _url = getImagePath(opts.imageFolder, image.url).path;
+					image.path = path.resolve(__path, _url);
+					if (!fs.existsSync(image.path)) {
+						var backupPath = path.resolve(opts.backupPath, _url);
+						image.path = backupPath;
+					}
+					images.push(image);
+
+				} else {
+					console.log('Skip ' + image.url + ' - not supported.', opts.verbose);
 				}
-
-				// Get the path to the image.
-				var _path = styleFilePath.substring(0, styleFilePath.lastIndexOf(path.sep));
-				var __path = _path.substring(0, _path.lastIndexOf(path.sep));
-				var _url = getImagePath(opts.imageFolder, image.url).path;
-				image.path = path.resolve(__path, _url);
-				if (!fs.existsSync(image.path)) {
-					var backupPath = path.resolve(opts.backupPath, _url);
-					image.path = backupPath;
-				}
-				images.push(image);
-			} else {
-				console.log('Skip ' + image.url + ' - not supported.', opts.verbose);
 			}
-		}
-	});
+		});
 
-	// Remove duplicates and empty values
-	images = lodash
-		.chain(images)
-		.unique(function(image) {
-			return image.path;
-		})
-		.value();
-	return images;
+		// Remove duplicates and empty values
+		images = lodash
+			.chain(images)
+			.unique(function(image) {
+				return image.path;
+			})
+			.value();
+		// console.log(images);
+		return [images, opts];
 }
 
 function getImagePath (imageFolder, fpath) {
@@ -489,7 +499,7 @@ function mapSpritesProperties(images, opts, sprites) {
  * @return {Promise}
  */
 function updateReferences(images, opts, sprites, css) {
-
+	// console.log(opts.rootValue);
 	return Q.Promise(function(resolve, reject) {
 		css.walkComments(function(comment) {
 			var rule, image, backgroundImage, backgroundPosition, backgroundSize, backgroundRepeat;
@@ -591,9 +601,23 @@ function hasSpriteTagInRule(rule) {
 }
 
 // 获取sprite后面的图片区分符
-function getImageUrlSpe(rule) {
+// pxToRem按单个图片单独处理，存储于image内，最终push到images
+function getImageUrlSpe(rule,image,rootValue) {
 	var match = /background[^:]*:.*url\(([\S]+)\)/gi.exec(rule);
-	return match ? match[1].replace(/['"]/gi, '').split('=')[1] : '';
+	if(match[1].replace(/['"]/gi, '').split('=')[2]){
+		image.rootValue = match[1].replace(/['"]/gi, '').split('=')[2];
+	}else{
+		image.rootValue = rootValue;
+	}
+	if(match){
+		image.urlSpe = match[1].replace(/['"]/gi, '').split('=')[1];
+		var pxOrRem = match[1].replace(/['"]/gi, '').split('=')[1].split('&')[1];
+		if(pxOrRem === '__px'){
+			image.rootValue = 0;
+		}
+	}
+	
+	return image;
 }
 
 /**
@@ -758,9 +782,11 @@ function getBackgroundPosition(image, opts) {
 	x = -1 * (image.retina ? image.coordinates.x / image.ratio : image.coordinates.x);
 	y = -1 * (image.retina ? image.coordinates.y / image.ratio : image.coordinates.y);
 	var template = lodash.template("<%= (x ? x + 'px' : x) %> <%= (y ? y + 'px' : y) %>");
-	
+	// console.log(opts);
 	// px to rem
+	//分图片处理 获取 单个images的rootValue
 	var rootValue = opts.rootValue;
+	// console.log(rootValue);
 	if( rootValue !== 0 ) {
 		x = pxToRem(x, rootValue);
 		y = pxToRem(y, rootValue);
@@ -783,7 +809,8 @@ function getBackgroundSize(image, opts) {
 	var template = lodash.template("<%= x %>px <%= y %>px");
 
 	// px to rem
-	var rootValue = opts.rootValue;
+	//分图片处理 获取 单个images的rootValue
+	var rootValue = image.rootValue;
 	if (rootValue !== 0) {
 		x = pxToRem(x, rootValue);
 		y = pxToRem(y, rootValue);
@@ -794,7 +821,8 @@ function getBackgroundSize(image, opts) {
 }
 
 function getDimensions (image, opts, prop) {
-	var rootValue = opts.rootValue;
+	//分图片处理 获取 单个images的rootValue
+	var rootValue = image.rootValue;
 	if (rootValue !== 0) {
 		return pxToRem(image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop], rootValue) + 'rem';
 	} else {
