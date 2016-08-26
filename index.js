@@ -601,9 +601,9 @@ function hasSpriteTagInRule(rule) {
 function getImageUrlSpe(rule,image,rootValue) {
 	var match = /background[^:]*:.*url\(([\S]+)\)/gi.exec(rule);
 	///&__rem=20 是否存在rootValue 存在则单独处理否则赋值系统默认值
-	match[1].replace(/['"]/gi, '').split('=')[2] ? image.rootValue = match[1].replace(/['"]/gi, '').split('=')[2] : image.rootValue = rootValue;
+	match[1].replace(/['"]/gi, '').split('&__rem=')[1] ? image.rootValue = match[1].replace(/['"]/gi, '').split('&__rem=')[1] : image.rootValue = rootValue;
 	///images/dog.png?__sprite=sprite_2   '=' 后面是否赋值？赋值 则分类合并雪碧图 否则 系统默认 sprite
-	match[1].replace(/['"]/gi, '').split('=')[1] ? image.urlSpe = match[1].replace(/['"]/gi, '').split('=')[1] : image.urlSpe = '';
+	match[1].replace(/['"]/gi, '').split('&')[0].split('=')[1] ? image.urlSpe = match[1].replace(/['"]/gi, '').split('=')[1] : image.urlSpe = '';
 	(match[1].replace(/['"]/gi, '').split('&')[1] === '__px') ? image.rootValue = 0 : null;
 	return {
 		'urlSpe': image.urlSpe,
@@ -799,7 +799,7 @@ function getBackgroundSize(image, opts) {
 
 	// px to rem
 	//分图片处理 获取 单个images的rootValue
-	var rootValue = image.rootValue;
+	var rootValue = opts.rootValue;
 	if (rootValue !== 0) {
 		x = pxToRem(x, rootValue);
 		y = pxToRem(y, rootValue);
