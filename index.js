@@ -318,7 +318,7 @@ function setTokens(images, opts, css) {
 					// We remove these declarations since
 					// our plugin will insert them when
 					// they are necessary.
-					rule.walkDecls(/^background-(repeat|size|position)|width|height$/, function(decl) {
+					rule.walkDecls(/^background-(repeat|size|position)|^width|^height$/, function(decl) {
 						decl.remove();
 					});
 
