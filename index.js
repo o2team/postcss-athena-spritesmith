@@ -51,12 +51,10 @@ var defaults = {
 	engineOpts    : {},
 	exportOpts    : {}
 };
-
 /**
  * Register the PostCSS plugin.
  */
 module.exports = postcss.plugin('postcss-athena-spritesmith', plugin);
-
 /**
  * PostCSS plugin definition.
  *
@@ -130,6 +128,9 @@ function getImages(css, opts) {
 			if (hasImageInRule(rule.toString()) && hasSpriteTagInRule(rule.toString())) {
 				image.url = getImageUrl(rule.toString());
 				urlSpeObj = getImageUrlSpe(rule.toString(),image,spriteRootValue);
+				if(urlSpeObj.widthHeight && urlSpeObj.widthHeight.indexOf('__widthHeight') != -1){
+					image.widthHeight = false;
+				}
 				image.urlSpe = urlSpeObj.urlSpe.split('&')[0];
 				image.rootValue = urlSpeObj.rootValue;
 				if (isImageSupported(image.url)) {
@@ -317,11 +318,16 @@ function setTokens(images, opts, css) {
 				if (image) {
 					// We remove these declarations since
 					// our plugin will insert them when
-					// they are necessary.
-					rule.walkDecls(/^background-(repeat|size|position)|^width|^height$/, function(decl) {
-						decl.remove();
-					});
-
+					// they are necessary
+					if(image.widthHeight || image.widthHeight === false){
+						rule.walkDecls(/^background-(repeat|size|position)$/, function(decl) {
+							decl.remove();
+						});
+					}else{
+						rule.walkDecls(/^background-(repeat|size|position)|^width|^height$/, function(decl) {
+							decl.remove();
+						});
+					}
 					if (decl.prop === BACKGROUND) {
 						
 						color = getColor(decl);					
@@ -474,6 +480,7 @@ function mapSpritesProperties(images, opts, sprites) {
 	return Q.Promise(function(resolve, reject) {
 		sprites = lodash.map(sprites, function(sprite) {
 			return lodash.map(sprite.coordinates, function (coordinates, imagePath) {
+			// console.log(JSON.stringify(coordinates,null,4));
 				return lodash.merge(lodash.find(images, { path: imagePath }), {
 					coordinates: coordinates,
 					spritePath: sprite.path,
@@ -513,7 +520,6 @@ function updateReferences(images, opts, sprites, css) {
 						prop: 'background-image',
 						value: getBackgroundImageUrl(image)
 					});
-
 					backgroundPosition = postcss.decl({
 						prop: 'background-position',
 						value: getBackgroundPosition(image,opts)
@@ -529,15 +535,16 @@ function updateReferences(images, opts, sprites, css) {
 
 					// Output the dimensions
 					rule = backgroundImage.parent;
-					if (opts.outputDimensions) {
-						['height', 'width'].forEach(function(prop) {
-							rule.insertAfter(backgroundImage, postcss.decl({
-								prop: prop,
-								value: getDimensions(image, opts, prop)
-							}));
-						});
+					if(!(image.widthHeight === false)){
+						if (opts.outputDimensions) {
+							['height', 'width'].forEach(function(prop) {
+								rule.insertAfter(backgroundImage, postcss.decl({
+									prop: prop,
+									value: getDimensions(image, opts, prop)
+								}));
+							});
+						}
 					}
-
 					rule.insertAfter(backgroundImage, backgroundPosition);
 
 					rule.insertAfter(backgroundPosition, backgroundRepeat);
@@ -605,12 +612,15 @@ function getImageUrlSpe(rule,image,rootValue) {
 	matchSprite.split('&__rem=')[1] ? image.rootValue = matchSprite.split('&__rem=')[1] : image.rootValue = rootValue;
 	///images/dog.png?__sprite=sprite_2   '=' 后面是否赋值？赋值 则分类合并雪碧图 否则 系统默认 sprite
 	matchSprite.split('&')[0].split('=')[1] ? image.urlSpe = matchSprite.split('=')[1] : image.urlSpe = '';
-	(matchSprite.split('&')[1] === '__px') ? image.rootValue = 0 : null;
+	matchSprite.split('&')[1] === '__px' ? image.rootValue = 0 : null;
+	matchSprite.indexOf('__widthHeight') != -1 ? image.widthHeight = false : null;
 	return {
 		'urlSpe': image.urlSpe,
-		'rootValue': image.rootValue
+		'rootValue': image.rootValue,
+		'widthHeight': image.widthHeight
 	};
 }
+
 
 /**
  * Extract the path to image from the url in given rule.
@@ -782,7 +792,7 @@ function getBackgroundPosition(image, opts) {
 		y = pxToRem(y, rootValue);
 		template = lodash.template("<%= (x ? x + 'rem' : x) %> <%= (y? y + 'rem' : y) %>");
 	}
-
+	//console.log('x:'+x+';'+ 'y:'+y);
 	return template({ x: x, y: y });
 }
 
