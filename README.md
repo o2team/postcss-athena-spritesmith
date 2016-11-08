@@ -45,7 +45,7 @@ h1 {
 }
 ```
 ### 功能更新目录
-- 提供了自定义生成多张雪碧图的功能，例如引用图片A/B/C/D，想要让A/B生成雪碧图sprite_1，C/D生成雪碧图sprite_2，则可以通过分别携带后缀?__sprite=sprite_1和?__sprite=sprite_2来生成两张雪碧图。
+提供了自定义生成多张雪碧图的功能，例如引用图片A/B/C/D，想要让A/B生成雪碧图sprite_1，C/D生成雪碧图sprite_2，则可以通过分别携带后缀?__sprite=sprite_1和?__sprite=sprite_2来生成两张雪碧图。
 #### source.css
 
 ```css
