@@ -136,11 +136,11 @@ function getImages(css, opts) {
 				if (isImageSupported(image.url)) {
 					// Perform search for retina
 					// images if option is allowed.
-					if (opts.retina && isRetinaImage(image.url)) {
+					//去掉 opts.retina 配置 by panxinwu
+					if (isRetinaImage(image.url)) {
 						image.retina = true;
 						image.ratio  = getRetinaRatio(image.url);
 					}
-
 					// Get the path to the image.
 					var _path = styleFilePath.substring(0, styleFilePath.lastIndexOf(path.sep));
 					var __path = _path.substring(0, _path.lastIndexOf(path.sep));
@@ -319,7 +319,7 @@ function setTokens(images, opts, css) {
 					// We remove these declarations since
 					// our plugin will insert them when
 					// they are necessary
-					if(image.widthHeight || image.widthHeight === false){
+					if(!image.rootValue && (image.widthHeight || image.widthHeight === false)){
 						rule.walkDecls(/^background-(repeat|size|position)$/, function(decl) {
 							decl.remove();
 						});
@@ -535,7 +535,7 @@ function updateReferences(images, opts, sprites, css) {
 
 					// Output the dimensions
 					rule = backgroundImage.parent;
-					if(!(image.widthHeight === false)){
+					if(!(image.widthHeight === false) || image.rootValue){
 						if (opts.outputDimensions) {
 							['height', 'width'].forEach(function(prop) {
 								rule.insertAfter(backgroundImage, postcss.decl({
@@ -607,17 +607,30 @@ function hasSpriteTagInRule(rule) {
 // pxToRem按单个图片单独处理，存储于image内，最终push到images
 function getImageUrlSpe(rule,image,rootValue) {
 	var match = /background[^:]*:.*url\(([\S]+)\)/gi.exec(rule);
+	
 	var matchSprite = match[1].replace(/['"]/gi, '');
 	///&__rem=20 是否存在rootValue 存在则单独处理否则赋值系统默认值
-	matchSprite.split('&__rem=')[1] ? image.rootValue = matchSprite.split('&__rem=')[1] : image.rootValue = rootValue;
+	matchSprite.split('&__rem=')[1] ? image.rootValue = /-?\d+\.?\d*/gi.exec(matchSprite.split('&__rem=')[1])[0] : image.rootValue = rootValue;
+
 	///images/dog.png?__sprite=sprite_2   '=' 后面是否赋值？赋值 则分类合并雪碧图 否则 系统默认 sprite
 	matchSprite.split('&')[0].split('=')[1] ? image.urlSpe = matchSprite.split('=')[1] : image.urlSpe = '';
 	matchSprite.split('&')[1] === '__px' ? image.rootValue = 0 : null;
 	matchSprite.indexOf('__widthHeight') != -1 ? image.widthHeight = false : null;
+	//有widthHeight参数则从css里保存width height数值用于后面计算pxToRem
+	if(image.widthHeight === false){
+		var widthReg = /width:\s*-?\d+\.?\d*px/gi;
+		var heightReg = /height:\s*-?\d+\.?\d*px/gi;
+		var matchWidth = widthReg.exec(rule);
+		var matchHeight = heightReg.exec(rule);
+		image.width = /-?\d+\.?\d*/gi.exec(matchWidth[0])[0];
+		image.height = /-?\d+\.?\d*/gi.exec(matchHeight[0])[0];
+	}
 	return {
 		'urlSpe': image.urlSpe,
 		'rootValue': image.rootValue,
-		'widthHeight': image.widthHeight
+		'widthHeight': image.widthHeight,
+		'width': image.width,
+		'height': image.height
 	};
 }
 
@@ -792,7 +805,6 @@ function getBackgroundPosition(image, opts) {
 		y = pxToRem(y, rootValue);
 		template = lodash.template("<%= (x ? x + 'rem' : x) %> <%= (y? y + 'rem' : y) %>");
 	}
-	//console.log('x:'+x+';'+ 'y:'+y);
 	return template({ x: x, y: y });
 }
 
@@ -822,9 +834,14 @@ function getBackgroundSize(image, opts) {
 
 function getDimensions (image, opts, prop) {
 	//分图片处理 获取 单个images的rootValue
+	// console.log(image[prop]);
 	var rootValue = image.rootValue;
 	if (rootValue !== 0) {
-		return pxToRem(image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop], rootValue) + 'rem';
+		if(image.width){
+			return pxToRem(image.retina ? image[prop] / image.ratio : image[prop], rootValue) + 'rem';
+		}else{
+			return pxToRem(image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop], rootValue) + 'rem';
+		}
 	} else {
 		return (image.retina ? image.coordinates[prop] / image.ratio : image.coordinates[prop]) + 'px';
 	}
