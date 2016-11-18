@@ -1,9 +1,9 @@
 # postcss-athena-spritesmith
 
 针对`Athena`订制的`CSS雪碧图`工具，源码改自[postcss-sprite](https://github.com/2createStudio/postcss-sprites)
+## ChangeLog
 
-* 增加了只对`?__sprite`后缀的样式做雪碧图处理
-* 修复了`Athena`的层级依赖关系
+请见[ChangeLog](CHANGELOG.md)
 
 ## Install
 
