@@ -252,16 +252,13 @@ function setupGroupBy(opts) {
 		opts.groupBy = [opts.groupBy];
 	}
 
-	// Group retina images
-	if (opts.retina) {
-		opts.groupBy.unshift(function(image) {
-			if (image.retina) {
-				return '@' + image.ratio + 'x';
-			}
+	opts.groupBy.unshift(function(image) {
+		if (image.retina) {
+			return '@' + image.ratio + 'x';
+		}
 
-			return null;
-		});
-	}
+		return null;
+	});
 }
 
 /**
