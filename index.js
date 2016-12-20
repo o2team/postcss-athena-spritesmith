@@ -615,12 +615,16 @@ function getImageUrlSpe(rule,image,rootValue) {
 	matchSprite.indexOf('__widthHeight') != -1 ? image.widthHeight = false : null;
 	//有widthHeight参数则从css里保存width height数值用于后面计算pxToRem
 	if(image.widthHeight === false){
-		var widthReg = /width:\s*-?\d+\.?\d*px/gi;
-		var heightReg = /height:\s*-?\d+\.?\d*px/gi;
+		var widthReg = /width:\s*-?\d+\.?\d*.?/gi;
+		var heightReg = /height:\s*-?\d+\.?\d*.?/gi;
 		var matchWidth = widthReg.exec(rule);
 		var matchHeight = heightReg.exec(rule);
-		image.width = /-?\d+\.?\d*/gi.exec(matchWidth[0])[0];
-		image.height = /-?\d+\.?\d*/gi.exec(matchHeight[0])[0];
+		if(matchWidth && lodash.isArray(matchWidth)){
+			image.width = /-?\d+\.?\d*/gi.exec(matchWidth[0])[0];
+		}
+		if(matchHeight && lodash.isArray(matchHeight)){
+			image.height = /-?\d+\.?\d*/gi.exec(matchHeight[0])[0];
+		}
 	}
 	return {
 		'urlSpe': image.urlSpe,
